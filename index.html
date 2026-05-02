@@ -213,27 +213,41 @@
   <div class="screen" id="s-foto">
     <div class="cam-area" id="cam-area">
       <span class="cam-product-label" id="foto-product-name"></span>
-      <div class="cam-frame">
-        <div class="cam-corner tl"></div><div class="cam-corner tr"></div>
-        <div class="cam-corner bl"></div><div class="cam-corner br"></div>
+      <img id="cam-preview" style="display:none;max-width:90%;max-height:200px;border-radius:10px;object-fit:cover;" src="" alt="foto">
+      <div id="cam-frame-wrap" style="display:flex;flex-direction:column;align-items:center">
+        <div class="cam-frame">
+          <div class="cam-corner tl"></div><div class="cam-corner tr"></div>
+          <div class="cam-corner bl"></div><div class="cam-corner br"></div>
+        </div>
       </div>
-      <p class="cam-hint">Aponte para a etiqueta de preço</p>
-      <div class="shutter" onclick="onCapture()">📸</div>
+      <p class="cam-hint" id="cam-hint">Tire uma foto da etiqueta de preço</p>
+      <div class="shutter" id="shutter-btn" onclick="onCapture()">📸</div>
+      <button id="cam-retake" style="display:none;margin-top:12px;background:rgba(255,255,255,0.15);color:white;border:none;border-radius:20px;padding:8px 20px;font-size:13px;font-family:var(--font);cursor:pointer" onclick="retakePhoto()">↩ Tirar outra foto</button>
+      <input type="file" id="cam-input" accept="image/*" capture="environment" style="display:none" onchange="onPhotoTaken(event)">
     </div>
     <div id="price-picker" style="display:none;background:var(--surface)">
       <div class="price-card">
-        <h2>Preços detectados</h2>
+        <h2>Digite o preço da etiqueta</h2>
         <div class="sub" id="picker-sub"></div>
         <div id="price-options-list"></div>
-        <p style="font-size:12px;color:var(--text3);margin-bottom:6px">Ou digitar manualmente:</p>
+        <p style="font-size:12px;color:var(--text3);margin-bottom:6px">Valor total do item:</p>
         <div class="manual-input">
           <input type="number" id="manual-price" placeholder="0,00" step="0.01" min="0" inputmode="decimal">
           <button class="btn" onclick="addManualPrice()">OK</button>
+        </div>
+        <p style="font-size:12px;color:var(--text3);margin:0 0 6px">Ou adicionar opção de quantidade (ex: atacadão):</p>
+        <div style="display:flex;gap:6px;margin-bottom:12px">
+          <input type="number" id="bulk-qty" placeholder="Qtd" min="1" inputmode="numeric" style="width:70px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px;font-size:14px;color:var(--text);font-family:var(--mono);outline:none">
+          <input type="number" id="bulk-price" placeholder="Preço unit." step="0.01" min="0" inputmode="decimal" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px;font-size:14px;color:var(--text);font-family:var(--mono);outline:none">
+          <button class="btn" onclick="addBulkOption()">+</button>
         </div>
       </div>
       <div class="confirm-area">
         <button class="btn-primary" onclick="confirmPrice()">Confirmar preço</button>
       </div>
+    </div>
+    <div style="background:var(--surface);border-top:1px solid var(--border);padding:10px 20px calc(10px + var(--safe-bottom))">
+      <button class="btn-ghost" style="width:100%" onclick="goTo('s-lista')">‹ Voltar para a lista</button>
     </div>
   </div>
 
@@ -511,30 +525,51 @@ function onProdClick(id) {
 
 // ── CÂMERA ────────────────────────────────────────────
 function onCapture() {
-  document.getElementById('cam-area').style.display = 'none';
+  // Abre câmera real do celular
+  const input = document.getElementById('cam-input');
+  input.click();
+}
+
+function onPhotoTaken(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  // Mostra preview da foto
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    const preview = document.getElementById('cam-preview');
+    preview.src = ev.target.result;
+    preview.style.display = 'block';
+    document.getElementById('cam-frame-wrap').style.display = 'none';
+    document.getElementById('shutter-btn').style.display = 'none';
+    document.getElementById('cam-hint').style.display = 'none';
+    document.getElementById('cam-retake').style.display = 'inline-block';
+  };
+  reader.readAsDataURL(file);
+
+  // Mostra área de entrada de preço manual (sem fake)
+  document.getElementById('cam-area').style.background = '#111';
+  showPricePicker();
+  e.target.value = ''; // reset para permitir nova foto do mesmo item
+}
+
+function showPricePicker() {
   document.getElementById('price-picker').style.display = 'block';
   document.getElementById('picker-sub').textContent = currentItem.name;
-
-  const base = parseFloat((Math.random() * 18 + 2).toFixed(2));
-  const opts = [
-    { qty: 1, unit: base, total: base },
-    { qty: 3, unit: +(base * 0.88).toFixed(2), total: +(base * 0.88 * 3).toFixed(2) },
-    { qty: 6, unit: +(base * 0.78).toFixed(2), total: +(base * 0.78 * 6).toFixed(2) },
-  ];
-  window._opts = opts;
-
-  document.getElementById('price-options-list').innerHTML = opts.map((o, i) => `
-    <div class="price-option ${i===0?'sel':''}" id="popt${i}" onclick="selOpt(${i})">
-      <div>
-        <div class="opt-qty">${o.qty === 1 ? '1 unidade' : o.qty + ' unidades · R$ ' + o.unit.toFixed(2).replace('.',',') + ' cada'}</div>
-        ${o.qty > 1 ? `<div class="opt-each">Economia de R$ ${((base - o.unit)*o.qty).toFixed(2).replace('.',',')} </div>` : ''}
-      </div>
-      <div class="opt-price">R$ ${o.total.toFixed(2).replace('.',',')}</div>
-    </div>
-  `).join('');
-
-  selectedPriceVal = opts[0].total;
+  document.getElementById('price-options-list').innerHTML = '';
+  selectedPriceVal = null;
   document.getElementById('manual-price').value = '';
+  document.getElementById('manual-price').focus();
+}
+
+function retakePhoto() {
+  const preview = document.getElementById('cam-preview');
+  preview.style.display = 'none';
+  document.getElementById('cam-frame-wrap').style.display = 'flex';
+  document.getElementById('shutter-btn').style.display = 'flex';
+  document.getElementById('cam-hint').style.display = 'block';
+  document.getElementById('cam-retake').style.display = 'none';
+  document.getElementById('price-picker').style.display = 'none';
 }
 
 function selOpt(i) {
@@ -542,6 +577,29 @@ function selOpt(i) {
   document.getElementById('popt' + i).classList.add('sel');
   selectedPriceVal = window._opts[i].total;
   document.getElementById('manual-price').value = '';
+}
+
+function addBulkOption() {
+  const qty = parseInt(document.getElementById('bulk-qty').value);
+  const unit = parseFloat(document.getElementById('bulk-price').value);
+  if (!qty || qty < 1 || isNaN(unit) || unit <= 0) { toast('Preencha quantidade e preço'); return; }
+  const total = +(unit * qty).toFixed(2);
+  if (!window._opts) window._opts = [];
+  const idx = window._opts.length;
+  window._opts.push({ qty, unit, total });
+  const div = document.createElement('div');
+  div.className = 'price-option';
+  div.id = 'popt' + idx;
+  div.onclick = () => selOpt(idx);
+  div.innerHTML = `<div>
+    <div class="opt-qty">${qty} unidade${qty>1?'s':''} · R$ ${unit.toFixed(2).replace('.',',')} cada</div>
+  </div>
+  <div class="opt-price">R$ ${total.toFixed(2).replace('.',',')}</div>`;
+  document.getElementById('price-options-list').appendChild(div);
+  selOpt(idx);
+  document.getElementById('bulk-qty').value = '';
+  document.getElementById('bulk-price').value = '';
+  toast('Opção adicionada!');
 }
 
 function addManualPrice() {
@@ -676,88 +734,6 @@ function toast(msg) {
 }
 
 // ── INIT ──────────────────────────────────────────────
-// Se não tem lista salva, pré-carrega a lista do usuário
-if (!lista.length) {
-  const listaInicial = `Mercado do mês: Maio
-
-Produtos de Limpeza 🧼
-- [ ] Detergente
-- [ ] Multiuso
-- [ ] Amaciante
-- [ ] Pato
-
-Produtos de Higiene 🚿
-- [ ] Creme dental
-- [ ] Sabonete
-- [ ] Lenço umedecido
-
-Utilidades 🧺
-- [ ] Papel toalha
-
-Mercearia 🫘
-- [ ] Arroz
-- [ ] Sal
-- [ ] Açúcar
-- [ ] Passata
-- [ ] Azeite extravirgem
-- [ ] Café
-- [ ] Macarrão sem glúten
-- [ ] Pão de forma
-- [ ] Ervilha seca
-- [ ] Farinha de trigo
-- [ ] Milho
-- [ ] Grão de bico
-- [ ] Fubá
-
-Proteína 🥩
-- [ ] Filé de frango
-- [ ] Sobrecoxa de frango
-- [ ] Carne moída
-- [ ] Ovo
-- [ ] Bife
-- [ ] Lombo suíno
-- [ ] Lata de atum
-
-Laticínios 🥛
-- [ ] Leite desnatado
-- [ ] Requeijão light
-- [ ] Margarina
-- [ ] Iogurte
-- [ ] Queijo
-- [ ] Leite em pó integral
-- [ ] Creme de leite
-
-Frutas e Legumes 🍎🥔
-- [ ] Banana prata
-- [ ] Maçã
-- [ ] Manga
-- [ ] Uva
-- [ ] Pêra
-- [ ] Laranja
-- [ ] Batata inglesa
-- [ ] Batata doce
-- [ ] Cenoura
-- [ ] Chuchu
-- [ ] Repolho
-- [ ] Brócolis
-- [ ] Abóbora
-- [ ] Cebola roxa
-- [ ] Tomate
-- [ ] Pimentão
-- [ ] Mandioquinha
-- [ ] Alface
-- [ ] Rúcula
-- [ ] Beterraba
-- [ ] Cebolinha
-
-Bebidas 🥤
-- [ ] Refrigerante zero
-- [ ] Água com gás
-- [ ] Suquinho da Maju`;
-  lista = parseListaText(listaInicial);
-  save('mkt_lista', lista);
-}
-
 renderLista();
 </script>
 </body>
