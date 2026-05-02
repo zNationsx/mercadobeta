@@ -248,10 +248,15 @@ html,body{height:100%;background:var(--bg);font-family:var(--font);color:var(--t
   </div>
   <div class="import-wrap">
     <p class="import-hint">Cole sua lista abaixo. O app reconhece qualquer formato — com ou sem categorias, emojis, traços, colchetes.</p>
-    <textarea id="import-txt" placeholder="Cole sua lista aqui..."></textarea>
+    <textarea id="import-txt" placeholder="Cole sua lista aqui..." maxlength="20000"></textarea>
     <div style="display:flex;gap:8px;margin-top:10px">
       <button class="btn-ghost" style="flex:1" onclick="document.getElementById('import-txt').value=''">Limpar</button>
       <button class="btn-primary" style="flex:2" onclick="importar()">Organizar →</button>
+    </div>
+    <div style="margin-top:16px;padding:12px 14px;background:var(--rd-dim);border:1px solid rgba(255,107,107,0.2);border-radius:var(--rs)">
+      <div style="font-size:12px;color:var(--rd);font-weight:500;margin-bottom:4px">App travado?</div>
+      <div style="font-size:11px;color:var(--tx3);margin-bottom:8px">Toque abaixo para apagar tudo e recomeçar.</div>
+      <button onclick="resetEmergencia()" style="width:100%;padding:10px;background:var(--rd);color:white;border:none;border-radius:var(--rs);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">🗑 Reset de emergência</button>
     </div>
   </div>
 </div>
@@ -711,8 +716,12 @@ function adicionarProduto(){
 function importar(){
   const text=document.getElementById('import-txt').value.trim();
   if(!text){toast('Cole sua lista primeiro');return;}
+  if(text.length>20000){toast('Texto muito longo. Cole só a lista de compras.');return;}
+  const lines=text.split('\n');
+  if(lines.length>500){toast('Lista muito grande. Máximo 500 linhas.');return;}
   const parsed=parseLista(text);
-  if(!parsed.length){toast('Nenhum produto encontrado');return;}
+  if(!parsed.length){toast('Nenhum produto encontrado. Verifique o formato.');return;}
+  if(parsed.length>200){toast('Muitos itens ('+parsed.length+'). Máximo 200 produtos.');return;}
   lista=parsed;SS('mkt_lista',lista);
   toast('✓ '+parsed.length+' produtos organizados!');ir('s-lista');
 }
@@ -858,7 +867,24 @@ function renderPerf(){
   `;
 }
 
-// ── TOAST
+function resetEmergencia(){
+  localStorage.clear();
+  lista=[];hist=[];precos={};
+  document.getElementById('import-txt').value='';
+  toast('✓ App resetado!');
+  ir('s-lista');
+}
+
+window.onerror=function(){
+  const msg=document.createElement('div');
+  msg.style.cssText='position:fixed;inset:0;background:#0f0f0f;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;padding:32px;text-align:center';
+  msg.innerHTML=`<div style="font-size:40px;margin-bottom:16px">⚠️</div>
+    <div style="font-size:18px;font-weight:600;color:#f0ede8;margin-bottom:8px">Algo deu errado</div>
+    <div style="font-size:14px;color:#9e9a94;margin-bottom:24px">Toque abaixo para resetar o app</div>
+    <button onclick="localStorage.clear();location.reload()" style="padding:14px 28px;background:#a8e063;color:#0f0f0f;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer">Resetar app</button>`;
+  document.body.appendChild(msg);
+  return true;
+};
 function toast(msg){
   const t=document.getElementById('toast');
   t.textContent=msg;t.classList.add('on');
