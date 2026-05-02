@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f0f0f">
+<title>Mercado</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --bg: #0f0f0f; --surface: #1a1a1a; --surface2: #242424; --surface3: #2e2e2e;
+    --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.14);
+    --text: #f0ede8; --text2: #9e9a94; --text3: #6b6762;
+    --green: #a8e063; --green-dim: rgba(168,224,99,0.12); --green-dark: #7ab830;
+    --red: #ff6b6b; --red-dim: rgba(255,107,107,0.12);
+    --amber: #ffc46b; --amber-dim: rgba(255,196,107,0.12);
+    --font: 'DM Sans', sans-serif; --mono: 'DM Mono', monospace;
+    --r: 14px; --r-sm: 8px; --safe-bottom: env(safe-area-inset-bottom, 16px);
+  }
+  html, body { height: 100%; background: var(--bg); font-family: var(--font); color: var(--text); overflow: hidden; }
+  #app { display: flex; flex-direction: column; height: 100dvh; max-width: 480px; margin: 0 auto; position: relative; overflow: hidden; }
+
+  .screen { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--bg); transform: translateX(100%); transition: transform 0.32s cubic-bezier(0.4,0,0.2,1); pointer-events: none; }
+  .screen.active { transform: translateX(0); pointer-events: all; }
+  .screen.prev { transform: translateX(-30%); }
+
+  .topbar { padding: 52px 20px 16px; flex-shrink: 0; }
+  .topbar-row { display: flex; align-items: center; justify-content: space-between; }
+  .topbar h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.5px; }
+  .topbar .sub { font-size: 13px; color: var(--text2); margin-top: 3px; }
+
+  .scroll { flex: 1; overflow-y: auto; padding: 0 16px 12px; -webkit-overflow-scrolling: touch; }
+  .scroll::-webkit-scrollbar { display: none; }
+
+  .bottom { flex-shrink: 0; background: var(--surface); border-top: 1px solid var(--border); padding: 12px 20px calc(12px + var(--safe-bottom)); }
+
+  .nav { display: flex; justify-content: space-around; margin-top: 8px; }
+  .nav-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: none; font-family: var(--font); cursor: pointer; padding: 4px 16px; border-radius: 12px; }
+  .nav-btn .nav-icon { font-size: 22px; line-height: 1; }
+  .nav-btn .nav-label { font-size: 10px; color: var(--text3); letter-spacing: 0.04em; font-weight: 500; }
+  .nav-btn.active .nav-label { color: var(--green); }
+
+  .total-display { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+  .total-label { font-size: 12px; color: var(--text2); }
+  .total-value { font-size: 28px; font-weight: 600; color: var(--green); font-family: var(--mono); letter-spacing: -1px; }
+  .progress-track { height: 3px; background: var(--surface3); border-radius: 2px; margin-bottom: 6px; overflow: hidden; }
+  .progress-bar { height: 100%; background: var(--green); border-radius: 2px; transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
+
+  .cat-card { background: var(--surface); border-radius: var(--r); border: 1px solid var(--border); margin-bottom: 10px; overflow: hidden; }
+  .cat-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; cursor: pointer; user-select: none; }
+  .cat-left { display: flex; align-items: center; gap: 12px; }
+  .cat-icon { width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+  .cat-title { font-size: 15px; font-weight: 500; }
+  .cat-count { font-size: 12px; color: var(--text2); margin-top: 1px; }
+  .cat-right { display: flex; align-items: center; gap: 10px; }
+  .cat-total { font-size: 13px; font-weight: 500; font-family: var(--mono); color: var(--text3); }
+  .cat-total.has { color: var(--green); }
+  .chevron { color: var(--text3); font-size: 12px; transition: transform 0.25s; }
+  .cat-card.open .chevron { transform: rotate(90deg); }
+  .prod-list { border-top: 1px solid var(--border); display: none; }
+  .cat-card.open .prod-list { display: block; }
+
+  .prod-row { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.12s; gap: 12px; }
+  .prod-row:last-child { border-bottom: none; }
+  .prod-row:active { background: var(--surface2); }
+  .prod-check { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--border2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s; }
+  .prod-check.done { background: var(--green); border-color: var(--green); }
+  .prod-check.done::after { content: ''; display: block; width: 8px; height: 5px; border-left: 2px solid #0f0f0f; border-bottom: 2px solid #0f0f0f; transform: rotate(-45deg) translate(1px,-1px); }
+  .prod-info { flex: 1; min-width: 0; }
+  .prod-name { font-size: 14px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .prod-name.done { color: var(--text3); text-decoration: line-through; }
+  .prod-qty-label { font-size: 11px; color: var(--text3); margin-top: 1px; }
+  .prod-price-tag { font-size: 13px; font-weight: 500; font-family: var(--mono); color: var(--green); white-space: nowrap; }
+  .prod-price-tag.empty { color: var(--text3); font-family: var(--font); font-size: 12px; font-weight: 400; }
+
+  .btn { padding: 10px 18px; background: var(--green-dim); color: var(--green); border: 1px solid rgba(168,224,99,0.2); border-radius: var(--r-sm); font-size: 14px; font-weight: 500; font-family: var(--font); cursor: pointer; white-space: nowrap; transition: all 0.15s; }
+  .btn:active { opacity: 0.75; transform: scale(0.97); }
+  .btn-ghost { padding: 8px 14px; background: none; color: var(--text2); border: 1px solid var(--border); border-radius: var(--r-sm); font-size: 13px; font-family: var(--font); cursor: pointer; }
+  .btn-primary { width: 100%; padding: 15px; background: var(--green); color: #0f0f0f; border: none; border-radius: var(--r); font-size: 15px; font-weight: 600; font-family: var(--font); cursor: pointer; transition: all 0.15s; }
+  .btn-primary:active { opacity: 0.85; transform: scale(0.98); }
+
+  /* IMPORTAR LISTA */
+  .import-area { flex: 1; display: flex; flex-direction: column; padding: 0 20px 20px; }
+  .import-area textarea { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 16px; font-size: 14px; color: var(--text); font-family: var(--font); line-height: 1.7; resize: none; outline: none; transition: border-color 0.15s; }
+  .import-area textarea:focus { border-color: var(--border2); }
+  .import-area textarea::placeholder { color: var(--text3); }
+  .import-hint { font-size: 12px; color: var(--text3); margin-bottom: 12px; line-height: 1.5; }
+
+  /* CÂMERA */
+  .cam-area { flex: 1; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+  .cam-frame { width: 80%; max-width: 300px; aspect-ratio: 2.5/1; border: 2px solid rgba(255,255,255,0.4); border-radius: 10px; position: relative; }
+  .cam-corner { position: absolute; width: 20px; height: 20px; border-color: var(--green); border-style: solid; }
+  .cam-corner.tl { top:-2px;left:-2px;border-width:3px 0 0 3px;border-radius:4px 0 0 0; }
+  .cam-corner.tr { top:-2px;right:-2px;border-width:3px 3px 0 0;border-radius:0 4px 0 0; }
+  .cam-corner.bl { bottom:-2px;left:-2px;border-width:0 0 3px 3px;border-radius:0 0 0 4px; }
+  .cam-corner.br { bottom:-2px;right:-2px;border-width:0 3px 3px 0;border-radius:0 0 4px 0; }
+  .cam-hint { color:rgba(255,255,255,0.5);font-size:13px;margin-top:20px;text-align:center; }
+  .cam-product-label { position:absolute;top:20px;left:0;right:0;text-align:center;font-size:16px;font-weight:500;color:white; }
+  .shutter { width:70px;height:70px;border-radius:50%;background:white;border:4px solid rgba(255,255,255,0.3);cursor:pointer;transition:transform 0.15s;margin-top:32px;display:flex;align-items:center;justify-content:center;font-size:26px; }
+  .shutter:active { transform:scale(0.88); }
+
+  .price-card { background:var(--surface);padding:20px 20px 0; }
+  .price-card h2 { font-size:16px;font-weight:500;margin-bottom:4px; }
+  .price-card .sub { font-size:12px;color:var(--text2);margin-bottom:16px; }
+  .price-option { display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-radius:var(--r-sm);border:1px solid var(--border);margin-bottom:8px;cursor:pointer;transition:all 0.15s; }
+  .price-option.sel { border-color:var(--green);background:var(--green-dim); }
+  .price-option .opt-qty { font-size:14px;font-weight:500;color:var(--text); }
+  .price-option.sel .opt-qty { color:var(--green); }
+  .price-option .opt-each { font-size:11px;color:var(--text2);margin-top:2px; }
+  .price-option .opt-price { font-size:18px;font-weight:600;font-family:var(--mono);color:var(--green); }
+  .manual-input { display:flex;gap:8px;margin:4px 0 16px; }
+  .manual-input input { flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px 14px;font-size:18px;color:var(--text);font-family:var(--mono);outline:none; }
+  .manual-input input:focus { border-color:var(--green); }
+  .manual-input input::placeholder { color:var(--text3);font-size:14px;font-family:var(--font); }
+  .confirm-area { padding:16px 20px calc(20px + var(--safe-bottom));background:var(--surface); }
+
+  /* HISTÓRICO */
+  .stat-row { display:flex;gap:10px;margin-bottom:16px; }
+  .stat-card { flex:1;background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:14px 16px; }
+  .stat-card .slabel { font-size:11px;color:var(--text3);font-weight:500;letter-spacing:0.04em;margin-bottom:4px; }
+  .stat-card .sval { font-size:20px;font-weight:600;font-family:var(--mono);color:var(--text); }
+  .hist-month { font-size:11px;font-weight:500;color:var(--text3);letter-spacing:0.08em;text-transform:uppercase;padding:4px 0 8px; }
+  .hist-card { background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;margin-bottom:8px; }
+  .hist-top { display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px; }
+  .hist-place { font-size:15px;font-weight:500; }
+  .hist-date { font-size:12px;color:var(--text3); }
+  .hist-amount { font-size:24px;font-weight:600;font-family:var(--mono);color:var(--text);letter-spacing:-0.5px; }
+  .hist-items { font-size:12px;color:var(--text3);margin-top:2px; }
+  .hist-tags { display:flex;gap:6px;flex-wrap:wrap;margin-top:10px; }
+  .tag { font-size:11px;padding:3px 9px;border-radius:20px;background:var(--surface2);color:var(--text2);border:1px solid var(--border); }
+
+  /* COMPARE */
+  .cmp-card { background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;margin-bottom:10px; }
+  .cmp-header { display:flex;align-items:center;justify-content:space-between;margin-bottom:14px; }
+  .cmp-name { font-size:14px;font-weight:500; }
+  .cmp-badge { font-size:12px;font-weight:600;font-family:var(--mono);padding:4px 10px;border-radius:20px; }
+  .cmp-badge.up { background:var(--red-dim);color:var(--red); }
+  .cmp-badge.down { background:var(--green-dim);color:var(--green); }
+  .cmp-badge.flat { background:var(--surface2);color:var(--text2); }
+  .pt-row { display:flex;align-items:center;gap:10px;margin-bottom:6px; }
+  .pt-month { font-size:11px;color:var(--text3);font-weight:500;width:36px;flex-shrink:0; }
+  .pt-track { flex:1;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden; }
+  .pt-fill { height:100%;border-radius:3px;transition:width 0.6s cubic-bezier(0.4,0,0.2,1); }
+  .pt-val { font-size:12px;font-family:var(--mono);font-weight:500;color:var(--text2);width:56px;text-align:right;flex-shrink:0; }
+  .compare-search { display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:50px;padding:10px 16px;margin-bottom:14px; }
+  .compare-search input { flex:1;background:none;border:none;font-size:14px;color:var(--text);font-family:var(--font);outline:none; }
+  .compare-search input::placeholder { color:var(--text3); }
+
+  @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+  .cat-card { animation: fadeUp 0.3s ease both; }
+
+  #toast { position:fixed;bottom:100px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--surface3);color:var(--text);padding:10px 20px;border-radius:50px;font-size:13px;opacity:0;transition:all 0.25s;z-index:999;white-space:nowrap;border:1px solid var(--border2);pointer-events:none; }
+  #toast.show { opacity:1;transform:translateX(-50%) translateY(0); }
+
+  .empty-state { text-align:center;padding:60px 20px;color:var(--text3);line-height:1.8;font-size:14px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- LISTA -->
+  <div class="screen active" id="s-lista">
+    <div class="topbar">
+      <div class="topbar-row">
+        <div>
+          <h1>Mercado 🛒</h1>
+          <div class="sub" id="lista-sub">carregando...</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-ghost" onclick="goTo('s-import')" style="font-size:13px">📋 Lista</button>
+          <button class="btn-ghost" onclick="finalizarCompra()" style="font-size:13px;color:var(--green);border-color:rgba(168,224,99,0.3)">✓ Salvar</button>
+        </div>
+      </div>
+    </div>
+    <div class="scroll" id="lista-scroll"></div>
+    <div class="bottom">
+      <div class="total-display">
+        <span class="total-label" id="progress-info">0 de 0 itens</span>
+        <span class="total-value" id="total-val">R$ 0,00</span>
+      </div>
+      <div class="progress-track"><div class="progress-bar" id="progress-bar" style="width:0%"></div></div>
+      <div class="nav">
+        <button class="nav-btn active" id="nav-lista" onclick="goTo('s-lista')"><span class="nav-icon">🛒</span><span class="nav-label">Lista</span></button>
+        <button class="nav-btn" id="nav-hist" onclick="goTo('s-hist')"><span class="nav-icon">🕐</span><span class="nav-label">Histórico</span></button>
+        <button class="nav-btn" id="nav-cmp" onclick="goTo('s-cmp')"><span class="nav-icon">📊</span><span class="nav-label">Comparar</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- IMPORTAR LISTA -->
+  <div class="screen" id="s-import">
+    <div class="topbar">
+      <div class="topbar-row">
+        <button class="btn-ghost" onclick="goTo('s-lista')">‹ Voltar</button>
+        <h1 style="font-size:18px">Colar lista</h1>
+        <div style="width:60px"></div>
+      </div>
+    </div>
+    <div class="import-area">
+      <p class="import-hint">Cole sua lista de compras abaixo. O app reconhece qualquer formato — com ou sem categorias, com ou sem emojis, com traços, colchetes, etc.</p>
+      <textarea id="import-textarea" placeholder="Mercado do mês: Maio&#10;&#10;Produtos de Limpeza 🧼&#10;- [ ] Detergente&#10;- [ ] Amaciante&#10;&#10;Mercearia 🫘&#10;- [ ] Arroz&#10;- [ ] Café&#10;..."></textarea>
+      <div style="margin-top:12px;display:flex;gap:8px">
+        <button class="btn-ghost" style="flex:1" onclick="clearImport()">Limpar</button>
+        <button class="btn-primary" style="flex:2" onclick="importarLista()">Organizar lista →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CÂMERA -->
+  <div class="screen" id="s-foto">
+    <div class="cam-area" id="cam-area">
+      <span class="cam-product-label" id="foto-product-name"></span>
+      <div class="cam-frame">
+        <div class="cam-corner tl"></div><div class="cam-corner tr"></div>
+        <div class="cam-corner bl"></div><div class="cam-corner br"></div>
+      </div>
+      <p class="cam-hint">Aponte para a etiqueta de preço</p>
+      <div class="shutter" onclick="onCapture()">📸</div>
+    </div>
+    <div id="price-picker" style="display:none;background:var(--surface)">
+      <div class="price-card">
+        <h2>Preços detectados</h2>
+        <div class="sub" id="picker-sub"></div>
+        <div id="price-options-list"></div>
+        <p style="font-size:12px;color:var(--text3);margin-bottom:6px">Ou digitar manualmente:</p>
+        <div class="manual-input">
+          <input type="number" id="manual-price" placeholder="0,00" step="0.01" min="0" inputmode="decimal">
+          <button class="btn" onclick="addManualPrice()">OK</button>
+        </div>
+      </div>
+      <div class="confirm-area">
+        <button class="btn-primary" onclick="confirmPrice()">Confirmar preço</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTÓRICO -->
+  <div class="screen" id="s-hist">
+    <div class="topbar">
+      <div class="topbar-row">
+        <h1>Histórico</h1>
+        <button class="btn-ghost" onclick="clearHistory()">limpar</button>
+      </div>
+    </div>
+    <div class="scroll" id="hist-scroll"></div>
+    <div class="bottom">
+      <div class="nav">
+        <button class="nav-btn" onclick="goTo('s-lista')"><span class="nav-icon">🛒</span><span class="nav-label">Lista</span></button>
+        <button class="nav-btn active" onclick="goTo('s-hist')"><span class="nav-icon">🕐</span><span class="nav-label">Histórico</span></button>
+        <button class="nav-btn" onclick="goTo('s-cmp')"><span class="nav-icon">📊</span><span class="nav-label">Comparar</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPARAR -->
+  <div class="screen" id="s-cmp">
+    <div class="topbar"><h1>Comparativo</h1></div>
+    <div class="scroll" id="cmp-scroll">
+      <div class="compare-search">
+        <span style="font-size:14px;color:var(--text3)">🔍</span>
+        <input type="text" id="cmp-search" placeholder="Buscar produto..." oninput="renderCompare()">
+      </div>
+      <div id="cmp-list"></div>
+    </div>
+    <div class="bottom">
+      <div class="nav">
+        <button class="nav-btn" onclick="goTo('s-lista')"><span class="nav-icon">🛒</span><span class="nav-label">Lista</span></button>
+        <button class="nav-btn" onclick="goTo('s-hist')"><span class="nav-icon">🕐</span><span class="nav-label">Histórico</span></button>
+        <button class="nav-btn active" onclick="goTo('s-cmp')"><span class="nav-icon">📊</span><span class="nav-label">Comparar</span></button>
+      </div>
+    </div>
+  </div>
+
+</div>
+<div id="toast"></div>
+
+<script>
+// ── STORAGE ───────────────────────────────────────────
+function load(k, d) { try { return JSON.parse(localStorage.getItem(k)) || d; } catch { return d; } }
+function save(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
+
+let lista = load('mkt_lista', []);
+let history = load('mkt_hist', []);
+let priceHistory = load('mkt_prices', {});
+
+function uid() { return Math.random().toString(36).slice(2,9); }
+
+// ── CATEGORIAS ────────────────────────────────────────
+const CATS = {
+  limpeza:    { label: 'Limpeza', icon: '🧼', bg: '#1a1e2a' },
+  higiene:    { label: 'Higiene', icon: '🚿', bg: '#1e1a2a' },
+  utilidades: { label: 'Utilidades', icon: '🧺', bg: '#201e1a' },
+  mercearia:  { label: 'Mercearia', icon: '🫘', bg: '#1e201a' },
+  proteina:   { label: 'Proteína', icon: '🥩', bg: '#2a1a1a' },
+  laticinios: { label: 'Laticínios', icon: '🥛', bg: '#1a2218' },
+  frutleg:    { label: 'Frutas e Legumes', icon: '🍎', bg: '#1a2a1a' },
+  bebidas:    { label: 'Bebidas', icon: '🥤', bg: '#1a2228' },
+  outros:     { label: 'Outros', icon: '📦', bg: '#202020' },
+};
+
+// Mapa de palavras-chave → categoria
+const CAT_KEYWORDS = {
+  limpeza:    ['detergente','multiuso','amaciante','pato','desinfetante','limpador','esponja','sabão em pó','sabao em po','cloro','alvejante','cif','ajax','veja','omo','ariel','comfort'],
+  higiene:    ['creme dental','sabonete','lenço umedecido','lenco umedecido','shampoo','condicionador','desodorante','absorvente','fio dental','enxaguante','escova','cotonete','papel higiênico','papel higienico','gilete','barbeador','hidratante'],
+  utilidades: ['papel toalha','papel alumínio','papel aluminio','papel manteiga','saco de lixo','sacola','pano','vassoura','rodo','guardanapo','palito'],
+  mercearia:  ['arroz','sal','açúcar','acucar','passata','azeite','café','cafe','macarrão','macarrao','pão de forma','pao de forma','ervilha','farinha','milho','grão de bico','grao de bico','fubá','fuba','feijão','feijao','lentilha','aveia','granola','maionese','ketchup','mostarda','molho','vinagre','tempero','caldo','shoyu','mistura','biscoito','bolacha','tapioca','polenta','cuscuz','quinoa'],
+  proteina:   ['filé','file','sobrecoxa','frango','carne moída','carne moida','ovo','bife','lombo','suíno','suino','linguiça','linguica','salsicha','peixe','atum','sardinha','camarão','camarao','alcatra','picanha','costela','patinho'],
+  laticinios: ['leite','requeijão','requeijao','margarina','iogurte','queijo','creme de leite','manteiga','nata','coalhada','cream cheese'],
+  frutleg:    ['banana','maçã','maca','manga','uva','pêra','pera','laranja','batata','cenoura','chuchu','repolho','brócolis','brocolis','abóbora','abobora','cebola','tomate','pimentão','pimentao','mandioquinha','alface','rúcula','rucula','beterraba','cebolinha','couve','espinafre','abobrinha','berinjela','pepino','milho verde','limão','limao','mamão','mamao','melancia','abacaxi','morango','pêssego','pessego','kiwi','caqui','maracujá','maracuja','inhame','mandioca','jiló','jilo','quiabo','vagem','alho','gengibre','salsinha','coentro'],
+  bebidas:    ['refrigerante','água com gás','agua com gas','suquinho','suco','água','agua','chá','cha','café solúvel','cafe solúvel','energético','energetico','cerveja','vinho','isotônico','isotonico'],
+};
+
+function detectCat(name) {
+  const n = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  for (const [cat, kws] of Object.entries(CAT_KEYWORDS)) {
+    for (const kw of kws) {
+      const k = kw.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      if (n.includes(k)) return cat;
+    }
+  }
+  return 'outros';
+}
+
+// ── PARSER DE LISTA ───────────────────────────────────
+function parseListaText(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const items = [];
+  let currentCatFromText = null;
+
+  // Detecta se linha é um cabeçalho de categoria (não produto)
+  function isHeader(line) {
+    const clean = line.replace(/[-\[\]x✓✗•*]/g,'').trim();
+    if (clean.length === 0) return false;
+    // Tem emoji ou termina com : ou é todo maiúsculo ou sem palavras comuns de produto
+    if (/\p{Emoji}/u.test(clean)) return true;
+    if (clean.endsWith(':')) return true;
+    if (/^[A-ZÁÉÍÓÚÀÂÃÊÔ\s]+$/.test(clean) && clean.length > 3) return true;
+    // Cabeçalhos conhecidos
+    const headers = ['limpeza','higiene','utilidades','mercearia','proteina','proteína','laticinios','laticínios','frutas','legumes','bebidas','outros','mercado'];
+    const c = clean.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    return headers.some(h => c.includes(h));
+  }
+
+  for (const line of lines) {
+    // Remove marcadores de lista: - [ ], - [x], -, *, •, números
+    const clean = line
+      .replace(/^-\s*\[[ xX✓✗]?\]\s*/, '')
+      .replace(/^[-*•]\s+/, '')
+      .replace(/^\d+\.\s+/, '')
+      .replace(/🧼|🚿|🧺|🫘|🥩|🥛|🍎|🥔|🥤/g, '')
+      .trim();
+
+    if (!clean || clean.length < 2) continue;
+
+    if (isHeader(clean)) {
+      // Tenta mapear o cabeçalho para uma categoria
+      const cl = clean.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      if (cl.includes('limpeza')) currentCatFromText = 'limpeza';
+      else if (cl.includes('higiene')) currentCatFromText = 'higiene';
+      else if (cl.includes('utilidade')) currentCatFromText = 'utilidades';
+      else if (cl.includes('mercearia')) currentCatFromText = 'mercearia';
+      else if (cl.includes('prote')) currentCatFromText = 'proteina';
+      else if (cl.includes('latic') || cl.includes('lacin')) currentCatFromText = 'laticinios';
+      else if (cl.includes('fruta') || cl.includes('legume') || cl.includes('verdura') || cl.includes('hortifruti')) currentCatFromText = 'frutleg';
+      else if (cl.includes('bebida')) currentCatFromText = 'bebidas';
+      // Se não reconhece o cabeçalho, mantém o atual
+      continue;
+    }
+
+    // É um produto
+    const cat = currentCatFromText || detectCat(clean);
+    items.push({ id: uid(), name: clean, qty: '', cat, price: null, done: false });
+  }
+
+  return items;
+}
+
+// ── SCREENS ───────────────────────────────────────────
+let currentScreen = 's-lista';
+
+function goTo(id) {
+  if (id === currentScreen) return;
+  document.getElementById(currentScreen).classList.add('prev');
+  document.getElementById(currentScreen).classList.remove('active');
+  document.getElementById(id).classList.add('active');
+  setTimeout(() => document.getElementById(currentScreen === id ? id : currentScreen.toString()).classList.remove('prev'), 350);
+  const prev = currentScreen;
+  currentScreen = id;
+  setTimeout(() => document.getElementById(prev).classList.remove('prev'), 350);
+
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  if (id === 's-lista') { renderLista(); document.querySelectorAll('[id^=nav-]')[0]?.classList.add('active'); }
+  if (id === 's-hist') { renderHistory(); }
+  if (id === 's-cmp') { renderCompare(); }
+}
+
+// ── IMPORTAR ──────────────────────────────────────────
+function importarLista() {
+  const text = document.getElementById('import-textarea').value.trim();
+  if (!text) { toast('Cole sua lista primeiro'); return; }
+  const parsed = parseListaText(text);
+  if (!parsed.length) { toast('Nenhum produto encontrado'); return; }
+  lista = parsed;
+  save('mkt_lista', lista);
+  toast('✓ ' + parsed.length + ' produtos organizados!');
+  goTo('s-lista');
+}
+
+function clearImport() {
+  document.getElementById('import-textarea').value = '';
+}
+
+// ── RENDER LISTA ──────────────────────────────────────
+function renderLista() {
+  const d = new Date();
+  document.getElementById('lista-sub').textContent = d.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+
+  const scroll = document.getElementById('lista-scroll');
+
+  if (!lista.length) {
+    scroll.innerHTML = `<div class="empty-state">Nenhuma lista ainda.<br>Toque em <strong style="color:var(--text2)">📋 Lista</strong> para colar sua lista de compras.</div>`;
+    updateTotal(); return;
+  }
+
+  // Agrupar por cat mantendo ordem de aparição
+  const order = [];
+  const groups = {};
+  lista.forEach(item => {
+    if (!groups[item.cat]) { groups[item.cat] = []; order.push(item.cat); }
+    groups[item.cat].push(item);
+  });
+
+  scroll.innerHTML = '';
+  order.forEach((cat, ci) => {
+    const items = groups[cat];
+    const catInfo = CATS[cat] || { label: cat, icon: '📦', bg: '#202020' };
+    const done = items.filter(i => i.done).length;
+    const catTotal = items.reduce((s, i) => s + (i.price || 0), 0);
+    const isOpen = done < items.length;
+
+    const card = document.createElement('div');
+    card.className = 'cat-card' + (isOpen ? ' open' : '');
+    card.style.animationDelay = (ci * 0.04) + 's';
+    card.innerHTML = `
+      <div class="cat-header" onclick="this.closest('.cat-card').classList.toggle('open')">
+        <div class="cat-left">
+          <div class="cat-icon" style="background:${catInfo.bg}">${catInfo.icon}</div>
+          <div>
+            <div class="cat-title">${catInfo.label}</div>
+            <div class="cat-count">${done} de ${items.length} marcados</div>
+          </div>
+        </div>
+        <div class="cat-right">
+          <span class="cat-total ${catTotal > 0 ? 'has' : ''}">R$ ${catTotal.toFixed(2).replace('.',',')}</span>
+          <span class="chevron">›</span>
+        </div>
+      </div>
+      <div class="prod-list">
+        ${items.map(item => `
+          <div class="prod-row" onclick="onProdClick('${item.id}')">
+            <div class="prod-check ${item.done ? 'done' : ''}"></div>
+            <div class="prod-info">
+              <div class="prod-name ${item.done ? 'done' : ''}">${item.name}</div>
+              ${item.qty ? `<div class="prod-qty-label">${item.qty}</div>` : ''}
+            </div>
+            <span class="prod-price-tag ${item.price ? '' : 'empty'}">${item.price ? 'R$ '+item.price.toFixed(2).replace('.',',') : '📷'}</span>
+          </div>
+        `).join('')}
+      </div>`;
+    scroll.appendChild(card);
+  });
+
+  updateTotal();
+}
+
+function updateTotal() {
+  const total = lista.reduce((s, i) => s + (i.price || 0), 0);
+  const done = lista.filter(i => i.done).length;
+  const all = lista.length;
+  document.getElementById('total-val').textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
+  document.getElementById('progress-info').textContent = done + ' de ' + all + ' itens';
+  document.getElementById('progress-bar').style.width = (all ? Math.round(done / all * 100) : 0) + '%';
+}
+
+// ── PRODUTO CLICK ─────────────────────────────────────
+let currentItem = null;
+let selectedPriceVal = null;
+
+function onProdClick(id) {
+  const item = lista.find(i => i.id === id);
+  if (!item) return;
+  if (item.done) {
+    item.done = false; item.price = null;
+    save('mkt_lista', lista); renderLista(); return;
+  }
+  currentItem = item;
+  selectedPriceVal = null;
+  document.getElementById('foto-product-name').textContent = item.name;
+  document.getElementById('price-picker').style.display = 'none';
+  document.getElementById('cam-area').style.display = 'flex';
+  const prev = currentScreen;
+  document.getElementById(prev).classList.remove('active');
+  document.getElementById(prev).classList.add('prev');
+  document.getElementById('s-foto').classList.add('active');
+  currentScreen = 's-foto';
+  setTimeout(() => document.getElementById(prev).classList.remove('prev'), 350);
+}
+
+// ── CÂMERA ────────────────────────────────────────────
+function onCapture() {
+  document.getElementById('cam-area').style.display = 'none';
+  document.getElementById('price-picker').style.display = 'block';
+  document.getElementById('picker-sub').textContent = currentItem.name;
+
+  const base = parseFloat((Math.random() * 18 + 2).toFixed(2));
+  const opts = [
+    { qty: 1, unit: base, total: base },
+    { qty: 3, unit: +(base * 0.88).toFixed(2), total: +(base * 0.88 * 3).toFixed(2) },
+    { qty: 6, unit: +(base * 0.78).toFixed(2), total: +(base * 0.78 * 6).toFixed(2) },
+  ];
+  window._opts = opts;
+
+  document.getElementById('price-options-list').innerHTML = opts.map((o, i) => `
+    <div class="price-option ${i===0?'sel':''}" id="popt${i}" onclick="selOpt(${i})">
+      <div>
+        <div class="opt-qty">${o.qty === 1 ? '1 unidade' : o.qty + ' unidades · R$ ' + o.unit.toFixed(2).replace('.',',') + ' cada'}</div>
+        ${o.qty > 1 ? `<div class="opt-each">Economia de R$ ${((base - o.unit)*o.qty).toFixed(2).replace('.',',')} </div>` : ''}
+      </div>
+      <div class="opt-price">R$ ${o.total.toFixed(2).replace('.',',')}</div>
+    </div>
+  `).join('');
+
+  selectedPriceVal = opts[0].total;
+  document.getElementById('manual-price').value = '';
+}
+
+function selOpt(i) {
+  document.querySelectorAll('.price-option').forEach(o => o.classList.remove('sel'));
+  document.getElementById('popt' + i).classList.add('sel');
+  selectedPriceVal = window._opts[i].total;
+  document.getElementById('manual-price').value = '';
+}
+
+function addManualPrice() {
+  const v = parseFloat(document.getElementById('manual-price').value);
+  if (isNaN(v) || v <= 0) { toast('Digite um preço válido'); return; }
+  selectedPriceVal = v;
+  document.querySelectorAll('.price-option').forEach(o => o.classList.remove('sel'));
+  toast('R$ ' + v.toFixed(2).replace('.',',') + ' selecionado');
+}
+
+function confirmPrice() {
+  if (!selectedPriceVal) { toast('Selecione ou digite o preço'); return; }
+  currentItem.price = selectedPriceVal;
+  currentItem.done = true;
+  const ym = new Date().toISOString().slice(0,7);
+  if (!priceHistory[currentItem.name]) priceHistory[currentItem.name] = [];
+  const ex = priceHistory[currentItem.name].find(p => p.ym === ym);
+  if (ex) ex.price = selectedPriceVal; else priceHistory[currentItem.name].push({ ym, price: selectedPriceVal });
+  save('mkt_prices', priceHistory);
+  save('mkt_lista', lista);
+  toast('✓ R$ ' + selectedPriceVal.toFixed(2).replace('.',',') + ' adicionado');
+  goTo('s-lista');
+}
+
+// ── HISTÓRICO ─────────────────────────────────────────
+function renderHistory() {
+  const scroll = document.getElementById('hist-scroll');
+  const total = lista.reduce((s, i) => s + (i.price || 0), 0);
+  const avg = history.length ? Math.round(history.reduce((s,h)=>s+h.total,0)/history.length) : 0;
+
+  let html = `<div class="stat-row">
+    <div class="stat-card"><div class="slabel">MÉDIA HISTÓRICO</div><div class="sval">R$ ${avg}</div></div>
+    <div class="stat-card"><div class="slabel">LISTA ATUAL</div><div class="sval">R$ ${total.toFixed(2).replace('.',',')}</div></div>
+  </div>`;
+
+  if (total > 0) {
+    html += `<div class="hist-month">Em andamento</div>
+    <div class="hist-card">
+      <div class="hist-top"><span class="hist-place">Lista atual</span><span class="hist-date">hoje</span></div>
+      <div class="hist-amount">R$ ${total.toFixed(2).replace('.',',')}</div>
+      <div class="hist-items">${lista.filter(i=>i.done).length} de ${lista.length} itens confirmados</div>
+      <div class="hist-tags">${[...new Set(lista.map(i=>i.cat))].map(c=>`<span class="tag">${CATS[c]?.icon} ${CATS[c]?.label||c}</span>`).join('')}</div>
+    </div>`;
+  }
+
+  if (history.length) {
+    html += `<div class="hist-month">Anteriores</div>`;
+    [...history].reverse().forEach(h => {
+      const d = new Date(h.date + 'T12:00:00');
+      html += `<div class="hist-card">
+        <div class="hist-top"><span class="hist-place">${h.place}</span><span class="hist-date">${d.toLocaleDateString('pt-BR',{day:'numeric',month:'short',year:'numeric'})}</span></div>
+        <div class="hist-amount">R$ ${h.total.toFixed(2).replace('.',',')}</div>
+        <div class="hist-items">${h.items} itens</div>
+        <div class="hist-tags">${(h.cats||[]).map(c=>`<span class="tag">${CATS[c]?.icon||''} ${CATS[c]?.label||c}</span>`).join('')}</div>
+      </div>`;
+    });
+  }
+
+  if (!history.length && total === 0) {
+    html += `<div class="empty-state">Nenhuma compra salva ainda.<br>Complete sua lista e toque em ✓ Salvar.</div>`;
+  }
+
+  scroll.innerHTML = html;
+}
+
+function clearHistory() {
+  if (!confirm('Limpar todo o histórico?')) return;
+  history = []; save('mkt_hist', history); renderHistory();
+}
+
+function finalizarCompra() {
+  const total = lista.reduce((s, i) => s + (i.price || 0), 0);
+  if (total === 0) { toast('Registre pelo menos um preço primeiro'); return; }
+  const place = prompt('Nome do mercado:', 'Mercado') || 'Mercado';
+  history.push({ id: uid(), place, date: new Date().toISOString().slice(0,10), total, items: lista.filter(i=>i.done).length, cats: [...new Set(lista.filter(i=>i.done).map(i=>i.cat))] });
+  save('mkt_hist', history);
+  lista.forEach(i => { i.done = false; i.price = null; });
+  save('mkt_lista', lista);
+  toast('✓ Compra salva! Nova lista pronta.');
+  renderLista();
+}
+
+// ── COMPARATIVO ───────────────────────────────────────
+const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+function renderCompare() {
+  const q = (document.getElementById('cmp-search')?.value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const list = document.getElementById('cmp-list');
+  const entries = Object.entries(priceHistory).filter(([name]) => {
+    if (!q) return true;
+    return name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes(q);
+  });
+
+  if (!entries.length) {
+    list.innerHTML = `<div class="empty-state">Nenhum histórico de preço ainda.<br>Comece a registrar preços no mercado!</div>`;
+    return;
+  }
+
+  list.innerHTML = entries.map(([name, records]) => {
+    const sorted = [...records].sort((a,b)=>a.ym.localeCompare(b.ym));
+    if (sorted.length < 2) return '';
+    const first = sorted[0].price, last = sorted[sorted.length-1].price;
+    const pct = (last - first) / first * 100;
+    const cls = pct > 0.5 ? 'up' : pct < -0.5 ? 'down' : 'flat';
+    const pctStr = (pct > 0 ? '+' : '') + pct.toFixed(1) + '%';
+    const maxP = Math.max(...sorted.map(r=>r.price));
+
+    return `<div class="cmp-card">
+      <div class="cmp-header">
+        <span class="cmp-name">${name}</span>
+        <span class="cmp-badge ${cls}">${pctStr}</span>
+      </div>
+      ${sorted.map(r => {
+        const [,m] = r.ym.split('-');
+        const w = Math.round((r.price/maxP)*88+8);
+        const color = r===sorted[sorted.length-1] ? (cls==='up'?'var(--red)':cls==='down'?'var(--green)':'var(--amber)') : 'var(--surface3)';
+        return `<div class="pt-row">
+          <span class="pt-month">${MONTHS[parseInt(m)-1]}</span>
+          <div class="pt-track"><div class="pt-fill" style="width:${w}%;background:${color}"></div></div>
+          <span class="pt-val">R$ ${r.price.toFixed(2).replace('.',',')}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).filter(Boolean).join('') || `<div class="empty-state">Nenhum produto com 2+ registros ainda.</div>`;
+}
+
+// ── TOAST ─────────────────────────────────────────────
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ── INIT ──────────────────────────────────────────────
+// Se não tem lista salva, pré-carrega a lista do usuário
+if (!lista.length) {
+  const listaInicial = `Mercado do mês: Maio
+
+Produtos de Limpeza 🧼
+- [ ] Detergente
+- [ ] Multiuso
+- [ ] Amaciante
+- [ ] Pato
+
+Produtos de Higiene 🚿
+- [ ] Creme dental
+- [ ] Sabonete
+- [ ] Lenço umedecido
+
+Utilidades 🧺
+- [ ] Papel toalha
+
+Mercearia 🫘
+- [ ] Arroz
+- [ ] Sal
+- [ ] Açúcar
+- [ ] Passata
+- [ ] Azeite extravirgem
+- [ ] Café
+- [ ] Macarrão sem glúten
+- [ ] Pão de forma
+- [ ] Ervilha seca
+- [ ] Farinha de trigo
+- [ ] Milho
+- [ ] Grão de bico
+- [ ] Fubá
+
+Proteína 🥩
+- [ ] Filé de frango
+- [ ] Sobrecoxa de frango
+- [ ] Carne moída
+- [ ] Ovo
+- [ ] Bife
+- [ ] Lombo suíno
+- [ ] Lata de atum
+
+Laticínios 🥛
+- [ ] Leite desnatado
+- [ ] Requeijão light
+- [ ] Margarina
+- [ ] Iogurte
+- [ ] Queijo
+- [ ] Leite em pó integral
+- [ ] Creme de leite
+
+Frutas e Legumes 🍎🥔
+- [ ] Banana prata
+- [ ] Maçã
+- [ ] Manga
+- [ ] Uva
+- [ ] Pêra
+- [ ] Laranja
+- [ ] Batata inglesa
+- [ ] Batata doce
+- [ ] Cenoura
+- [ ] Chuchu
+- [ ] Repolho
+- [ ] Brócolis
+- [ ] Abóbora
+- [ ] Cebola roxa
+- [ ] Tomate
+- [ ] Pimentão
+- [ ] Mandioquinha
+- [ ] Alface
+- [ ] Rúcula
+- [ ] Beterraba
+- [ ] Cebolinha
+
+Bebidas 🥤
+- [ ] Refrigerante zero
+- [ ] Água com gás
+- [ ] Suquinho da Maju`;
+  lista = parseListaText(listaInicial);
+  save('mkt_lista', lista);
+}
+
+renderLista();
+</script>
+</body>
+</html>
