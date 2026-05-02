@@ -171,6 +171,7 @@
           <div class="sub" id="lista-sub">carregando...</div>
         </div>
         <div style="display:flex;gap:8px">
+          <button class="btn-ghost" onclick="resetarTudo()" style="font-size:13px;color:var(--red);border-color:rgba(255,107,107,0.3)">🗑 Limpar</button>
           <button class="btn-ghost" onclick="goTo('s-import')" style="font-size:13px">📋 Lista</button>
           <button class="btn-ghost" onclick="finalizarCompra()" style="font-size:13px;color:var(--green);border-color:rgba(168,224,99,0.3)">✓ Salvar</button>
         </div>
@@ -670,7 +671,30 @@ function renderHistory() {
   scroll.innerHTML = html;
 }
 
-function clearHistory() {
+function resetarTudo() {
+  const action = prompt('O que deseja limpar?\n\n1. Limpar só os preços (mantém a lista)\n2. Limpar lista inteira\n3. Apagar tudo (lista + histórico)\n\nDigite 1, 2 ou 3:');
+  if (action === '1') {
+    lista.forEach(i => { i.done = false; i.price = null; });
+    save('mkt_lista', lista);
+    renderLista();
+    toast('Preços limpos!');
+  } else if (action === '2') {
+    if (!confirm('Apagar toda a lista?')) return;
+    lista = [];
+    save('mkt_lista', lista);
+    renderLista();
+    toast('Lista apagada!');
+  } else if (action === '3') {
+    if (!confirm('Apagar TUDO? Lista, preços e histórico serão perdidos.')) return;
+    lista = []; history = []; priceHistory = {};
+    save('mkt_lista', lista);
+    save('mkt_hist', history);
+    save('mkt_prices', priceHistory);
+    localStorage.removeItem('mkt_version');
+    renderLista();
+    toast('Tudo apagado!');
+  }
+}
   if (!confirm('Limpar todo o histórico?')) return;
   history = []; save('mkt_hist', history); renderHistory();
 }
