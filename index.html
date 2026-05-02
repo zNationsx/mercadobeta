@@ -395,6 +395,12 @@ html,body{height:100%;background:var(--bg);font-family:var(--font);color:var(--t
 <div id="toast"></div>
 
 <script>
+// ── EMERGÊNCIA VIA URL
+if(new URLSearchParams(location.search).get('reset')==='1'){
+  localStorage.clear();
+  history.replaceState({},'',location.pathname);
+}
+
 const LS=k=>{try{return JSON.parse(localStorage.getItem(k))}catch{return null}};
 const SS=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
 
