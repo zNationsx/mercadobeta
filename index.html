@@ -201,7 +201,7 @@
     </div>
     <div class="import-area">
       <p class="import-hint">Cole sua lista de compras abaixo. O app reconhece qualquer formato — com ou sem categorias, com ou sem emojis, com traços, colchetes, etc.</p>
-      <textarea id="import-textarea" placeholder="Mercado do mês: Maio&#10;&#10;Produtos de Limpeza 🧼&#10;- [ ] Detergente&#10;- [ ] Amaciante&#10;&#10;Mercearia 🫘&#10;- [ ] Arroz&#10;- [ ] Café&#10;..."></textarea>
+      <textarea id="import-textarea" placeholder="Cole sua lista aqui..."></textarea>
       <div style="margin-top:12px;display:flex;gap:8px">
         <button class="btn-ghost" style="flex:1" onclick="clearImport()">Limpar</button>
         <button class="btn-primary" style="flex:2" onclick="importarLista()">Organizar lista →</button>
@@ -734,6 +734,13 @@ function toast(msg) {
 }
 
 // ── INIT ──────────────────────────────────────────────
+// Limpa lista antiga se veio do seed (versão anterior do app)
+const APP_VERSION = '2';
+if (localStorage.getItem('mkt_version') !== APP_VERSION) {
+  lista = [];
+  save('mkt_lista', lista);
+  localStorage.setItem('mkt_version', APP_VERSION);
+}
 renderLista();
 </script>
 </body>
