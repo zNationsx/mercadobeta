@@ -553,8 +553,6 @@ function openMenu(id) {
 
 
 function showPricePicker() {
-  document.getElementById('price-picker').style.display = 'block';
-  document.getElementById('picker-product-name').textContent = currentItem.name;
   document.getElementById('unit-price').value = '';
   document.getElementById('offer-qty').value = '';
   document.getElementById('offer-unit').value = '';
@@ -562,9 +560,9 @@ function showPricePicker() {
   document.getElementById('offer-area').style.display = 'none';
   document.getElementById('offer-toggle').style.background = 'var(--surface3)';
   document.getElementById('offer-knob').style.left = '3px';
-  window._offerActive = false;
+  _offerActive = false;
   selectedPriceVal = null;
-  setTimeout(() => document.getElementById('unit-price').focus(), 300);
+  setTimeout(() => document.getElementById('unit-price').focus(), 350);
 }
 
 let _offerActive = false;
@@ -597,13 +595,7 @@ function recalcTotal() {
 
 
 
-function addManualPrice() {
-  const v = parseFloat(document.getElementById('manual-price').value);
-  if (isNaN(v) || v <= 0) { toast('Digite um preço válido'); return; }
-  selectedPriceVal = v;
-  document.querySelectorAll('.price-option').forEach(o => o.classList.remove('sel'));
-  toast('R$ ' + v.toFixed(2).replace('.',',') + ' selecionado');
-}
+
 
 function confirmPrice() {
   let finalPrice = null;
