@@ -210,26 +210,17 @@
     </div>
   </div>
 
-  <!-- CÂMERA -->
+  <!-- PREÇO -->
   <div class="screen" id="s-foto">
-    <div class="cam-area" id="cam-area">
-      <span class="cam-product-label" id="foto-product-name"></span>
-      <img id="cam-preview" style="display:none;max-width:90%;max-height:200px;border-radius:10px;object-fit:cover;" src="" alt="foto">
-      <div id="cam-frame-wrap" style="display:flex;flex-direction:column;align-items:center">
-        <div class="cam-frame">
-          <div class="cam-corner tl"></div><div class="cam-corner tr"></div>
-          <div class="cam-corner bl"></div><div class="cam-corner br"></div>
-        </div>
+    <div class="topbar">
+      <div class="topbar-row">
+        <button class="btn-ghost" onclick="goTo('s-lista')">‹ Voltar</button>
+        <h1 style="font-size:17px" id="foto-product-name"></h1>
+        <div style="width:60px"></div>
       </div>
-      <p class="cam-hint" id="cam-hint">Tire uma foto da etiqueta de preço</p>
-      <div class="shutter" id="shutter-btn" onclick="onCapture()">📸</div>
-      <button id="cam-retake" style="display:none;margin-top:12px;background:rgba(255,255,255,0.15);color:white;border:none;border-radius:20px;padding:8px 20px;font-size:13px;font-family:var(--font);cursor:pointer" onclick="retakePhoto()">↩ Tirar outra foto</button>
-      <input type="file" id="cam-input" accept="image/*" capture="environment" style="display:none" onchange="onPhotoTaken(event)">
     </div>
-    <div id="price-picker" style="display:none;background:var(--surface)">
-      <div class="price-card">
-        <h2 id="picker-product-name" style="font-size:16px;margin-bottom:16px"></h2>
-
+    <div class="scroll">
+      <div id="price-picker">
         <p style="font-size:12px;color:var(--text3);margin-bottom:6px">Preço por unidade</p>
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px">
           <span style="font-size:20px;color:var(--text2);font-weight:500">R$</span>
@@ -261,14 +252,10 @@
             <span style="font-size:13px;color:var(--green)" id="offer-total-label"></span>
           </div>
         </div>
-
-      </div>
-      <div class="confirm-area">
-        <button class="btn-primary" onclick="confirmPrice()">Confirmar ✓</button>
       </div>
     </div>
-    <div style="background:var(--surface);border-top:1px solid var(--border);padding:10px 20px calc(10px + var(--safe-bottom))">
-      <button class="btn-ghost" style="width:100%" onclick="goTo('s-lista')">‹ Voltar para a lista</button>
+    <div class="bottom">
+      <button class="btn-primary" onclick="confirmPrice()">Confirmar ✓</button>
     </div>
   </div>
 
@@ -495,13 +482,13 @@ function renderLista() {
       </div>
       <div class="prod-list">
         ${items.map(item => `
-          <div class="prod-row" onclick="onProdClick('${item.id}')">
-            <div class="prod-check ${item.done ? 'done' : ''}"></div>
-            <div class="prod-info">
+          <div class="prod-row">
+            <div class="prod-check ${item.done ? 'done' : ''}" onclick="toggleCheck('${item.id}')"></div>
+            <div class="prod-info" onclick="openPreco('${item.id}')">
               <div class="prod-name ${item.done ? 'done' : ''}">${item.name}</div>
-              ${item.qty ? `<div class="prod-qty-label">${item.qty}</div>` : ''}
+              <div class="prod-qty-label">${item.price ? 'R$ '+item.price.toFixed(2).replace('.',',') : 'toque para inserir preço'}</div>
             </div>
-            <span class="prod-price-tag ${item.price ? '' : 'empty'}">${item.price ? 'R$ '+item.price.toFixed(2).replace('.',',') : '📷'}</span>
+            <button onclick="openMenu('${item.id}')" style="background:none;border:none;color:var(--text3);font-size:20px;padding:4px 8px;cursor:pointer;line-height:1;flex-shrink:0">···</button>
           </div>
         `).join('')}
       </div>`;
@@ -524,18 +511,24 @@ function updateTotal() {
 let currentItem = null;
 let selectedPriceVal = null;
 
-function onProdClick(id) {
+function toggleCheck(id) {
   const item = lista.find(i => i.id === id);
   if (!item) return;
   if (item.done) {
     item.done = false; item.price = null;
-    save('mkt_lista', lista); renderLista(); return;
+    save('mkt_lista', lista); renderLista();
+  } else {
+    openPreco(id);
   }
+}
+
+function openPreco(id) {
+  const item = lista.find(i => i.id === id);
+  if (!item) return;
   currentItem = item;
   selectedPriceVal = null;
   document.getElementById('foto-product-name').textContent = item.name;
-  document.getElementById('price-picker').style.display = 'none';
-  document.getElementById('cam-area').style.display = 'flex';
+  showPricePicker();
   const prev = currentScreen;
   document.getElementById(prev).classList.remove('active');
   document.getElementById(prev).classList.add('prev');
@@ -544,28 +537,19 @@ function onProdClick(id) {
   setTimeout(() => document.getElementById(prev).classList.remove('prev'), 350);
 }
 
-// ── CÂMERA ────────────────────────────────────────────
-function onCapture() {
-  document.getElementById('cam-input').click();
+function openMenu(id) {
+  const item = lista.find(i => i.id === id);
+  if (!item) return;
+  const action = prompt(`"${item.name}"\n\nEscolha:\n1. Editar preço\n2. Remover produto\n\nDigite 1 ou 2:`);
+  if (action === '1') openPreco(id);
+  else if (action === '2') {
+    lista = lista.filter(i => i.id !== id);
+    save('mkt_lista', lista); renderLista();
+    toast('Produto removido');
+  }
 }
 
-function onPhotoTaken(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = function(ev) {
-    const preview = document.getElementById('cam-preview');
-    preview.src = ev.target.result;
-    preview.style.display = 'block';
-    document.getElementById('cam-frame-wrap').style.display = 'none';
-    document.getElementById('shutter-btn').style.display = 'none';
-    document.getElementById('cam-hint').style.display = 'none';
-    document.getElementById('cam-retake').style.display = 'inline-block';
-    showPricePicker();
-  };
-  reader.readAsDataURL(file);
-  e.target.value = '';
-}
+
 
 function showPricePicker() {
   document.getElementById('price-picker').style.display = 'block';
@@ -608,58 +592,9 @@ function recalcTotal() {
   }
 }
 
-function renderPriceOptions(opts) {
-  const list = document.getElementById('price-options-list');
-  list.innerHTML = opts.map((o, i) => `
-    <div class="price-option ${i===0?'sel':''}" id="popt${i}" onclick="selOpt(${i})">
-      <div>
-        <div class="opt-qty">${o.qty === 1 ? '1 unidade' : o.qty + ' unidades · R$ ' + o.unit.toFixed(2).replace('.',',') + ' cada'}</div>
-        ${o.qty > 1 ? `<div class="opt-each">total R$ ${o.total.toFixed(2).replace('.',',')}</div>` : ''}
-      </div>
-      <div class="opt-price">R$ ${o.total.toFixed(2).replace('.',',')}</div>
-    </div>`).join('');
-  selOpt(0);
-}
 
-function retakePhoto() {
-  document.getElementById('cam-preview').style.display = 'none';
-  document.getElementById('cam-frame-wrap').style.display = 'flex';
-  document.getElementById('shutter-btn').style.display = 'flex';
-  document.getElementById('cam-hint').style.display = 'block';
-  document.getElementById('cam-retake').style.display = 'none';
-  document.getElementById('price-picker').style.display = 'none';
-  window._opts = [];
-}
 
-function selOpt(i) {
-  document.querySelectorAll('.price-option').forEach(o => o.classList.remove('sel'));
-  document.getElementById('popt' + i).classList.add('sel');
-  selectedPriceVal = window._opts[i].total;
-  document.getElementById('manual-price').value = '';
-}
 
-function addBulkOption() {
-  const qty = parseInt(document.getElementById('bulk-qty').value);
-  const unit = parseFloat(document.getElementById('bulk-price').value);
-  if (!qty || qty < 1 || isNaN(unit) || unit <= 0) { toast('Preencha quantidade e preço'); return; }
-  const total = +(unit * qty).toFixed(2);
-  if (!window._opts) window._opts = [];
-  const idx = window._opts.length;
-  window._opts.push({ qty, unit, total });
-  const div = document.createElement('div');
-  div.className = 'price-option';
-  div.id = 'popt' + idx;
-  div.onclick = () => selOpt(idx);
-  div.innerHTML = `<div>
-    <div class="opt-qty">${qty} unidade${qty>1?'s':''} · R$ ${unit.toFixed(2).replace('.',',')} cada</div>
-  </div>
-  <div class="opt-price">R$ ${total.toFixed(2).replace('.',',')}</div>`;
-  document.getElementById('price-options-list').appendChild(div);
-  selOpt(idx);
-  document.getElementById('bulk-qty').value = '';
-  document.getElementById('bulk-price').value = '';
-  toast('Opção adicionada!');
-}
 
 function addManualPrice() {
   const v = parseFloat(document.getElementById('manual-price').value);
