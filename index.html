@@ -500,8 +500,9 @@ function renderLista(){
     card.className='cat-card'+(isOpen?' open':'');
     card.style.animationDelay=(ci*0.04)+'s';
     const rows=items.map(item=>{
-      const priceLabel=item.price
-        ?`R$ ${item.price.toFixed(2).replace('.',',')}${item.qty>1?' × '+item.qty+' = R$ '+(item.price*item.qty).toFixed(2).replace('.',','):''}`
+      const totalItem=item.price?(item.price*(item.qty||1)):null;
+      const priceLabel=totalItem
+        ?`R$ ${totalItem.toFixed(2).replace('.',',')}`
         :'toque para inserir preço';
       return`<div class="swipe-wrap" id="sw-${item.id}">
         <div class="swipe-actions">
@@ -512,7 +513,7 @@ function renderLista(){
           <div class="pcheck ${item.done?'done':''}" onclick="toggleItem('${item.id}')"></div>
           <div class="prod-info" onclick="abrirPreco('${item.id}')">
             <div class="prod-name ${item.done?'done':''}">${item.name}</div>
-            <div class="prod-sub ${item.price?'has':''}">${priceLabel}</div>
+            <div class="prod-sub ${totalItem?'has':''}">${priceLabel}</div>
           </div>
         </div>
       </div>`;
@@ -533,6 +534,7 @@ function renderLista(){
   });
   atualizarTotal();
   initSwipe();
+  mostrarDicaSwipe();
 }
 
 function atualizarTotal(){
@@ -544,7 +546,29 @@ function atualizarTotal(){
   document.getElementById('prog-bar').style.width=(all?Math.round(done/all*100):0)+'%';
 }
 
-// ── SWIPE
+// ── DICA SWIPE
+function mostrarDicaSwipe(){
+  if(localStorage.getItem('swipe_hint_shown')||!lista.length)return;
+  localStorage.setItem('swipe_hint_shown','1');
+  setTimeout(()=>{
+    const firstRow=document.querySelector('.prod-row');
+    if(!firstRow)return;
+    // anima o primeiro item para a esquerda e volta
+    firstRow.style.transition='transform 0.4s ease';
+    firstRow.style.transform='translateX(-80px)';
+    setTimeout(()=>{
+      firstRow.style.transform='translateX(0)';
+      setTimeout(()=>{ firstRow.style.transition=''; },400);
+    },600);
+    // mostra tooltip
+    const hint=document.createElement('div');
+    hint.style.cssText='position:fixed;bottom:110px;left:50%;transform:translateX(-50%);background:#2e2e2e;color:#f0ede8;padding:8px 16px;border-radius:50px;font-size:12px;z-index:200;border:1px solid rgba(255,255,255,0.14);white-space:nowrap;opacity:0;transition:opacity 0.3s';
+    hint.textContent='← Arraste um produto para editar ou excluir';
+    document.body.appendChild(hint);
+    setTimeout(()=>hint.style.opacity='1',50);
+    setTimeout(()=>{hint.style.opacity='0';setTimeout(()=>hint.remove(),300);},3000);
+  },800);
+}
 function initSwipe(){
   document.querySelectorAll('.prod-row').forEach(row=>{
     let startX=0,startY=0,dx=0,swiped=false;
