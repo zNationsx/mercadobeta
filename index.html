@@ -150,6 +150,7 @@
   .compare-search input::placeholder { color:var(--text3); }
 
   @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes spin { to { transform: rotate(360deg); } }
   .cat-card { animation: fadeUp 0.3s ease both; }
 
   #toast { position:fixed;bottom:100px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--surface3);color:var(--text);padding:10px 20px;border-radius:50px;font-size:13px;opacity:0;transition:all 0.25s;z-index:999;white-space:nowrap;border:1px solid var(--border2);pointer-events:none; }
@@ -525,18 +526,16 @@ function onProdClick(id) {
 
 // ── CÂMERA ────────────────────────────────────────────
 function onCapture() {
-  // Abre câmera real do celular
-  const input = document.getElementById('cam-input');
-  input.click();
+  document.getElementById('cam-input').click();
 }
 
 function onPhotoTaken(e) {
   const file = e.target.files[0];
   if (!file) return;
-
-  // Mostra preview da foto
   const reader = new FileReader();
   reader.onload = function(ev) {
+    const b64 = ev.target.result.split(',')[1];
+    const mime = file.type || 'image/jpeg';
     const preview = document.getElementById('cam-preview');
     preview.src = ev.target.result;
     preview.style.display = 'block';
@@ -544,32 +543,101 @@ function onPhotoTaken(e) {
     document.getElementById('shutter-btn').style.display = 'none';
     document.getElementById('cam-hint').style.display = 'none';
     document.getElementById('cam-retake').style.display = 'inline-block';
+    extractPricesWithAI(b64, mime);
   };
   reader.readAsDataURL(file);
-
-  // Mostra área de entrada de preço manual (sem fake)
-  document.getElementById('cam-area').style.background = '#111';
-  showPricePicker();
-  e.target.value = ''; // reset para permitir nova foto do mesmo item
+  e.target.value = '';
 }
 
-function showPricePicker() {
+async function extractPricesWithAI(b64, mime) {
   document.getElementById('price-picker').style.display = 'block';
   document.getElementById('picker-sub').textContent = currentItem.name;
-  document.getElementById('price-options-list').innerHTML = '';
+  document.getElementById('price-options-list').innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;padding:14px 0;color:var(--text2);font-size:14px">
+      <div style="width:18px;height:18px;border:2px solid var(--green);border-top-color:transparent;border-radius:50%;animation:spin 0.7s linear infinite;flex-shrink:0"></div>
+      Lendo etiqueta com IA...
+    </div>`;
   selectedPriceVal = null;
   document.getElementById('manual-price').value = '';
-  document.getElementById('manual-price').focus();
+  window._opts = [];
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mime, data: b64 } },
+            { type: 'text', text: `Você é um leitor de etiquetas de supermercado. Analise esta imagem e extraia TODOS os preços visíveis.
+
+Responda SOMENTE com JSON válido, sem texto antes ou depois, neste formato exato:
+{
+  "produto": "nome do produto se visível ou null",
+  "opcoes": [
+    {"qty": 1, "unit": 3.29, "total": 3.29},
+    {"qty": 3, "unit": 2.89, "total": 8.67},
+    {"qty": 6, "unit": 2.59, "total": 15.54}
+  ]
+}
+
+Regras:
+- qty = quantidade de unidades
+- unit = preço por unidade
+- total = qty × unit
+- Inclua TODAS as opções de quantidade/preço que aparecem na etiqueta
+- Se só houver um preço, retorne apenas uma opção com qty:1
+- Se não encontrar nenhum preço, retorne {"produto": null, "opcoes": []}
+- Números decimais com ponto (não vírgula)` }
+          ]
+        }]
+      })
+    });
+
+    const data = await res.json();
+    const text = data.content?.find(c => c.type === 'text')?.text || '';
+    const json = JSON.parse(text.replace(/```json|```/g, '').trim());
+
+    window._opts = json.opcoes || [];
+
+    if (!window._opts.length) {
+      document.getElementById('price-options-list').innerHTML = `<p style="font-size:13px;color:var(--text2);margin-bottom:12px">Não consegui ler o preço. Digite manualmente abaixo.</p>`;
+      document.getElementById('manual-price').focus();
+      return;
+    }
+
+    renderPriceOptions(window._opts);
+
+  } catch(err) {
+    document.getElementById('price-options-list').innerHTML = `<p style="font-size:13px;color:var(--red);margin-bottom:12px">Erro ao ler a imagem. Digite o preço manualmente.</p>`;
+    document.getElementById('manual-price').focus();
+  }
+}
+
+function renderPriceOptions(opts) {
+  const list = document.getElementById('price-options-list');
+  list.innerHTML = opts.map((o, i) => `
+    <div class="price-option ${i===0?'sel':''}" id="popt${i}" onclick="selOpt(${i})">
+      <div>
+        <div class="opt-qty">${o.qty === 1 ? '1 unidade' : o.qty + ' unidades · R$ ' + o.unit.toFixed(2).replace('.',',') + ' cada'}</div>
+        ${o.qty > 1 ? `<div class="opt-each">total R$ ${o.total.toFixed(2).replace('.',',')}</div>` : ''}
+      </div>
+      <div class="opt-price">R$ ${o.total.toFixed(2).replace('.',',')}</div>
+    </div>`).join('');
+  selOpt(0);
 }
 
 function retakePhoto() {
-  const preview = document.getElementById('cam-preview');
-  preview.style.display = 'none';
+  document.getElementById('cam-preview').style.display = 'none';
   document.getElementById('cam-frame-wrap').style.display = 'flex';
   document.getElementById('shutter-btn').style.display = 'flex';
   document.getElementById('cam-hint').style.display = 'block';
   document.getElementById('cam-retake').style.display = 'none';
   document.getElementById('price-picker').style.display = 'none';
+  window._opts = [];
 }
 
 function selOpt(i) {
