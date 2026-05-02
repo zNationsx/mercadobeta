@@ -228,23 +228,43 @@
     </div>
     <div id="price-picker" style="display:none;background:var(--surface)">
       <div class="price-card">
-        <h2>Digite o preço da etiqueta</h2>
-        <div class="sub" id="picker-sub"></div>
-        <div id="price-options-list"></div>
-        <p style="font-size:12px;color:var(--text3);margin-bottom:6px">Valor total do item:</p>
-        <div class="manual-input">
-          <input type="number" id="manual-price" placeholder="0,00" step="0.01" min="0" inputmode="decimal">
-          <button class="btn" onclick="addManualPrice()">OK</button>
+        <h2 id="picker-product-name" style="font-size:16px;margin-bottom:16px"></h2>
+
+        <p style="font-size:12px;color:var(--text3);margin-bottom:6px">Preço por unidade</p>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px">
+          <span style="font-size:20px;color:var(--text2);font-weight:500">R$</span>
+          <input type="number" id="unit-price" placeholder="0,00" step="0.01" min="0" inputmode="decimal"
+            style="flex:1;background:var(--surface2);border:1.5px solid var(--green);border-radius:var(--r-sm);padding:12px 14px;font-size:26px;color:var(--text);font-family:var(--mono);outline:none"
+            oninput="recalcTotal()">
         </div>
-        <p style="font-size:12px;color:var(--text3);margin:0 0 6px">Ou adicionar opção de quantidade (ex: atacadão):</p>
-        <div style="display:flex;gap:6px;margin-bottom:12px">
-          <input type="number" id="bulk-qty" placeholder="Qtd" min="1" inputmode="numeric" style="width:70px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px;font-size:14px;color:var(--text);font-family:var(--mono);outline:none">
-          <input type="number" id="bulk-price" placeholder="Preço unit." step="0.01" min="0" inputmode="decimal" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px;font-size:14px;color:var(--text);font-family:var(--mono);outline:none">
-          <button class="btn" onclick="addBulkOption()">+</button>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-top:1px solid var(--border)">
+          <span style="font-size:14px;color:var(--text)">Tem oferta por quantidade?</span>
+          <div id="offer-toggle" onclick="toggleOffer()" style="width:44px;height:26px;background:var(--surface3);border-radius:13px;position:relative;cursor:pointer;transition:background 0.2s">
+            <div id="offer-knob" style="position:absolute;top:3px;left:3px;width:20px;height:20px;background:white;border-radius:50%;transition:left 0.2s"></div>
+          </div>
         </div>
+
+        <div id="offer-area" style="display:none;padding-top:12px">
+          <p style="font-size:12px;color:var(--text3);margin-bottom:10px">Quantas unidades e preço de cada</p>
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
+            <input type="number" id="offer-qty" placeholder="3" min="2" inputmode="numeric"
+              style="width:64px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px 8px;font-size:22px;color:var(--text);font-family:var(--mono);outline:none;text-align:center"
+              oninput="recalcTotal()">
+            <span style="color:var(--text3);font-size:13px;white-space:nowrap">un. por R$</span>
+            <input type="number" id="offer-unit" placeholder="2,89" step="0.01" min="0" inputmode="decimal"
+              style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px 10px;font-size:22px;color:var(--text);font-family:var(--mono);outline:none"
+              oninput="recalcTotal()">
+            <span style="color:var(--text3);font-size:13px">cada</span>
+          </div>
+          <div id="offer-total-display" style="display:none;background:var(--green-dim);border:1px solid rgba(168,224,99,0.2);border-radius:var(--r-sm);padding:12px 14px">
+            <span style="font-size:13px;color:var(--green)" id="offer-total-label"></span>
+          </div>
+        </div>
+
       </div>
       <div class="confirm-area">
-        <button class="btn-primary" onclick="confirmPrice()">Confirmar preço</button>
+        <button class="btn-primary" onclick="confirmPrice()">Confirmar ✓</button>
       </div>
     </div>
     <div style="background:var(--surface);border-top:1px solid var(--border);padding:10px 20px calc(10px + var(--safe-bottom))">
@@ -534,8 +554,6 @@ function onPhotoTaken(e) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = function(ev) {
-    const b64 = ev.target.result.split(',')[1];
-    const mime = file.type || 'image/jpeg';
     const preview = document.getElementById('cam-preview');
     preview.src = ev.target.result;
     preview.style.display = 'block';
@@ -543,77 +561,50 @@ function onPhotoTaken(e) {
     document.getElementById('shutter-btn').style.display = 'none';
     document.getElementById('cam-hint').style.display = 'none';
     document.getElementById('cam-retake').style.display = 'inline-block';
-    extractPricesWithAI(b64, mime);
+    showPricePicker();
   };
   reader.readAsDataURL(file);
   e.target.value = '';
 }
 
-async function extractPricesWithAI(b64, mime) {
+function showPricePicker() {
   document.getElementById('price-picker').style.display = 'block';
-  document.getElementById('picker-sub').textContent = currentItem.name;
-  document.getElementById('price-options-list').innerHTML = `
-    <div style="display:flex;align-items:center;gap:10px;padding:14px 0;color:var(--text2);font-size:14px">
-      <div style="width:18px;height:18px;border:2px solid var(--green);border-top-color:transparent;border-radius:50%;animation:spin 0.7s linear infinite;flex-shrink:0"></div>
-      Lendo etiqueta com IA...
-    </div>`;
+  document.getElementById('picker-product-name').textContent = currentItem.name;
+  document.getElementById('unit-price').value = '';
+  document.getElementById('offer-qty').value = '';
+  document.getElementById('offer-unit').value = '';
+  document.getElementById('offer-total-display').style.display = 'none';
+  document.getElementById('offer-area').style.display = 'none';
+  document.getElementById('offer-toggle').style.background = 'var(--surface3)';
+  document.getElementById('offer-knob').style.left = '3px';
+  window._offerActive = false;
   selectedPriceVal = null;
-  document.getElementById('manual-price').value = '';
-  window._opts = [];
-
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mime, data: b64 } },
-            { type: 'text', text: `Você é um leitor de etiquetas de supermercado. Analise esta imagem e extraia TODOS os preços visíveis.
-
-Responda SOMENTE com JSON válido, sem texto antes ou depois, neste formato exato:
-{
-  "produto": "nome do produto se visível ou null",
-  "opcoes": [
-    {"qty": 1, "unit": 3.29, "total": 3.29},
-    {"qty": 3, "unit": 2.89, "total": 8.67},
-    {"qty": 6, "unit": 2.59, "total": 15.54}
-  ]
+  setTimeout(() => document.getElementById('unit-price').focus(), 300);
 }
 
-Regras:
-- qty = quantidade de unidades
-- unit = preço por unidade
-- total = qty × unit
-- Inclua TODAS as opções de quantidade/preço que aparecem na etiqueta
-- Se só houver um preço, retorne apenas uma opção com qty:1
-- Se não encontrar nenhum preço, retorne {"produto": null, "opcoes": []}
-- Números decimais com ponto (não vírgula)` }
-          ]
-        }]
-      })
-    });
+let _offerActive = false;
+function toggleOffer() {
+  _offerActive = !_offerActive;
+  document.getElementById('offer-area').style.display = _offerActive ? 'block' : 'none';
+  document.getElementById('offer-toggle').style.background = _offerActive ? 'var(--green)' : 'var(--surface3)';
+  document.getElementById('offer-knob').style.left = _offerActive ? '21px' : '3px';
+  if (_offerActive) setTimeout(() => document.getElementById('offer-qty').focus(), 200);
+  recalcTotal();
+}
 
-    const data = await res.json();
-    const text = data.content?.find(c => c.type === 'text')?.text || '';
-    const json = JSON.parse(text.replace(/```json|```/g, '').trim());
-
-    window._opts = json.opcoes || [];
-
-    if (!window._opts.length) {
-      document.getElementById('price-options-list').innerHTML = `<p style="font-size:13px;color:var(--text2);margin-bottom:12px">Não consegui ler o preço. Digite manualmente abaixo.</p>`;
-      document.getElementById('manual-price').focus();
-      return;
-    }
-
-    renderPriceOptions(window._opts);
-
-  } catch(err) {
-    document.getElementById('price-options-list').innerHTML = `<p style="font-size:13px;color:var(--red);margin-bottom:12px">Erro ao ler a imagem. Digite o preço manualmente.</p>`;
-    document.getElementById('manual-price').focus();
+function recalcTotal() {
+  if (!_offerActive) { selectedPriceVal = null; return; }
+  const qty = parseInt(document.getElementById('offer-qty').value);
+  const unit = parseFloat(document.getElementById('offer-unit').value);
+  if (qty >= 2 && unit > 0) {
+    const total = +(qty * unit).toFixed(2);
+    selectedPriceVal = total;
+    document.getElementById('offer-total-display').style.display = 'block';
+    document.getElementById('offer-total-label').textContent =
+      qty + ' × R$ ' + unit.toFixed(2).replace('.',',') + ' = R$ ' + total.toFixed(2).replace('.',',');
+  } else {
+    document.getElementById('offer-total-display').style.display = 'none';
+    selectedPriceVal = null;
   }
 }
 
@@ -679,16 +670,27 @@ function addManualPrice() {
 }
 
 function confirmPrice() {
-  if (!selectedPriceVal) { toast('Selecione ou digite o preço'); return; }
-  currentItem.price = selectedPriceVal;
+  let finalPrice = null;
+  if (_offerActive) {
+    const qty = parseInt(document.getElementById('offer-qty').value);
+    const unit = parseFloat(document.getElementById('offer-unit').value);
+    if (qty >= 2 && unit > 0) finalPrice = +(qty * unit).toFixed(2);
+    else { toast('Preencha quantidade e preço da oferta'); return; }
+  } else {
+    const v = parseFloat(document.getElementById('unit-price').value);
+    if (v > 0) finalPrice = v;
+    else { toast('Digite o preço por unidade'); return; }
+  }
+  currentItem.price = finalPrice;
   currentItem.done = true;
   const ym = new Date().toISOString().slice(0,7);
   if (!priceHistory[currentItem.name]) priceHistory[currentItem.name] = [];
   const ex = priceHistory[currentItem.name].find(p => p.ym === ym);
-  if (ex) ex.price = selectedPriceVal; else priceHistory[currentItem.name].push({ ym, price: selectedPriceVal });
+  const unitVal = _offerActive ? parseFloat(document.getElementById('offer-unit').value) : finalPrice;
+  if (ex) ex.price = unitVal; else priceHistory[currentItem.name].push({ ym, price: unitVal });
   save('mkt_prices', priceHistory);
   save('mkt_lista', lista);
-  toast('✓ R$ ' + selectedPriceVal.toFixed(2).replace('.',',') + ' adicionado');
+  toast('✓ R$ ' + finalPrice.toFixed(2).replace('.',',') + ' adicionado');
   goTo('s-lista');
 }
 
